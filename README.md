@@ -73,6 +73,15 @@ uv run translate translate paper.pdf --bilingual
 uv run translate translate paper.pdf --pages "1-5,10"
 ```
 
+> **⚠️ 中文路径问题**：如果项目路径包含中文（如 `D:\项目\`），可能导致 `ModuleNotFoundError: No module named 'src'` 错误。请使用以下备用命令：
+>
+> ```bash
+> # 备用运行方式（模块方式）
+> uv run python -m src.main translate paper.pdf -o paper_zh.pdf
+> ```
+>
+> 或将项目移动到纯英文路径下。
+
 ### Python API使用
 
 ```python
@@ -229,6 +238,24 @@ uv run translate test-connection -t openai
 uv run translate test-connection -t local_llm
 ```
 
+### 备用命令（中文路径兼容）
+
+如果遇到模块导入问题，使用模块方式运行：
+
+```bash
+# 查看帮助
+uv run python -m src.main --help
+
+# 翻译PDF
+uv run python -m src.main translate <input.pdf> [OPTIONS]
+
+# 提取PDF文本
+uv run python -m src.main extract <input.pdf> -o output.json
+
+# 测试API连接
+uv run python -m src.main test-connection -t openai
+```
+
 ## ⚠️ 注意事项
 
 1. **PDF格式保留限制**
@@ -244,6 +271,13 @@ uv run translate test-connection -t local_llm
 3. **API费用**
    - 请注意各翻译服务的计费方式
    - 建议先用少量页面测试
+
+4. **中文路径兼容性**
+   - 项目路径包含中文字符时，`uv run translate` 命令可能报错 `ModuleNotFoundError: No module named 'src'`
+   - 这是由于 Windows 下路径编码问题导致入口点脚本无法正确解析路径
+   - **解决方案**：
+     - 使用模块方式运行：`uv run python -m src.main translate ...`
+     - 或将项目移动到纯英文路径（推荐）
 
 ## 📄 许可证
 
