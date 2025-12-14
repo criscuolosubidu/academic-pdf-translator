@@ -28,13 +28,25 @@
 
 ## 📦 安装
 
+本项目使用 [uv](https://docs.astral.sh/uv/) 管理依赖。
+
 ```bash
+# 安装 uv (如果尚未安装)
+# Windows (PowerShell)
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# macOS/Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
 # 克隆仓库
 git clone <repository-url>
 cd academic-paper-translator
 
-# 安装依赖
-pip install -r requirements.txt
+# 安装依赖 (uv 会自动创建虚拟环境)
+uv sync
+
+# 如需本地LLM支持
+uv sync --extra local-llm
 ```
 
 ## 🚀 快速开始
@@ -43,20 +55,22 @@ pip install -r requirements.txt
 
 ```bash
 # 使用OpenAI翻译
-export OPENAI_API_KEY="your-api-key"
-python translate.py translate paper.pdf
+export OPENAI_API_KEY="your-api-key"  # Linux/macOS
+$env:OPENAI_API_KEY="your-api-key"    # Windows PowerShell
+
+uv run translate translate paper.pdf
 
 # 指定输出文件
-python translate.py translate paper.pdf -o paper_zh.pdf
+uv run translate translate paper.pdf -o paper_zh.pdf
 
 # 使用本地LLM
-python translate.py translate paper.pdf -t local_llm
+uv run translate translate paper.pdf -t local_llm
 
 # 生成双语对照版本
-python translate.py translate paper.pdf --bilingual
+uv run translate translate paper.pdf --bilingual
 
 # 只翻译指定页面
-python translate.py translate paper.pdf --pages "1-5,10"
+uv run translate translate paper.pdf --pages "1-5,10"
 ```
 
 ### Python API使用
@@ -140,9 +154,9 @@ pdf:
 
 ```
 .
-├── translate.py          # 命令行入口
+├── translate.py          # 命令行入口 (兼容旧用法)
+├── pyproject.toml        # 项目配置和依赖 (uv)
 ├── config.yaml.example   # 配置模板
-├── requirements.txt      # 依赖
 └── src/
     ├── __init__.py
     ├── main.py           # 主程序和CLI
@@ -201,18 +215,18 @@ class CustomRenderer(PDFRenderer):
 
 ```bash
 # 查看帮助
-python translate.py --help
-python translate.py translate --help
+uv run translate --help
+uv run translate translate --help
 
 # 翻译PDF
-python translate.py translate <input.pdf> [OPTIONS]
+uv run translate translate <input.pdf> [OPTIONS]
 
 # 提取PDF文本（调试用）
-python translate.py extract <input.pdf> -o output.json
+uv run translate extract <input.pdf> -o output.json
 
 # 测试API连接
-python translate.py test-connection -t openai
-python translate.py test-connection -t local_llm
+uv run translate test-connection -t openai
+uv run translate test-connection -t local_llm
 ```
 
 ## ⚠️ 注意事项
