@@ -1,0 +1,45 @@
+# 翻译器配置示例
+
+# 默认翻译器: google, openai, local_llm
+default_translator: openai
+
+# 源语言和目标语言
+source_lang: en
+target_lang: zh
+
+# Google Translate API 配置
+google:
+  # 设置环境变量 GOOGLE_APPLICATION_CREDENTIALS 指向服务账号密钥文件
+  project_id: your-project-id
+
+# OpenAI API 配置
+openai:
+  api_key: ${OPENAI_API_KEY}  # 从环境变量读取
+  model: gpt-4o
+  base_url: https://api.openai.com/v1
+  # 学术翻译专用提示词
+  system_prompt: |
+    你是一位专业的学术论文翻译专家，精通医学和计算机科学领域。
+    请将以下学术文本翻译成中文，保持专业术语的准确性。
+    注意：
+    1. 保留专业术语的英文原文（用括号标注）
+    2. 保持学术论文的正式语体
+    3. 确保医学/计算机术语翻译的准确性
+
+# 本地LLM配置 (vLLM, ollama等)
+local_llm:
+  base_url: http://localhost:8000/v1
+  model: qwen2.5-72b-instruct
+  api_key: not-needed  # 本地部署通常不需要
+  system_prompt: |
+    你是一位专业的学术论文翻译专家，精通医学和计算机科学领域。
+    请将以下学术文本翻译成中文，保持专业术语的准确性。
+
+# PDF处理配置
+pdf:
+  # 是否保留原文（双语对照）
+  bilingual: false
+  # 字体缩放因子（翻译后文本可能更长/短）
+  font_scale: 0.9
+  # 备用字体（用于中文显示）
+  fallback_font: null  # 留空则使用内置字体
