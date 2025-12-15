@@ -5,6 +5,7 @@ PDF处理模块
 
 from .extractor import PDFExtractor, TextBlock, PageContent
 from .renderer import PDFRenderer
+from .markdown_renderer import MarkdownRenderer
 from .processor import PDFProcessor
 
 __all__ = [
@@ -12,5 +13,6 @@ __all__ = [
     "TextBlock", 
     "PageContent",
     "PDFRenderer",
+    "MarkdownRenderer",
     "PDFProcessor",
 ]
