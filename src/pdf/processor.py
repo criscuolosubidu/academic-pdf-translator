@@ -4,12 +4,21 @@ PDF处理器
 """
 
 from pathlib import Path
-from typing import List, Optional, Callable
+from typing import List, Optional, Callable, Literal
 from tqdm import tqdm
+from enum import Enum
 
 from .extractor import PDFExtractor, PageContent, TextBlock
 from .renderer import PDFRenderer
+from .markdown_renderer import MarkdownRenderer
 from ..translators.base import BaseTranslator
+
+
+class OutputFormat(Enum):
+    """输出格式"""
+    PDF = "pdf"
+    MARKDOWN = "markdown"
+    BOTH = "both"  # 同时输出PDF和Markdown
 
 
 class PDFProcessor:
@@ -25,6 +34,7 @@ class PDFProcessor:
         bilingual: bool = False,
         fallback_font: Optional[str] = None,
         progress_callback: Optional[Callable[[int, int], None]] = None,
+        output_format: OutputFormat = OutputFormat.PDF,
     ):
         """
         初始化PDF处理器
@@ -35,12 +45,14 @@ class PDFProcessor:
             bilingual: 是否生成双语对照
             fallback_font: 备用字体路径
             progress_callback: 进度回调函数 (current, total)
+            output_format: 输出格式 (pdf, markdown, both)
         """
         self.translator = translator
         self.font_scale = font_scale
         self.bilingual = bilingual
         self.fallback_font = fallback_font
         self.progress_callback = progress_callback
+        self.output_format = output_format
     
     def _should_translate_block(self, block: TextBlock) -> bool:
         """
@@ -186,17 +198,22 @@ class PDFProcessor:
         
         Args:
             input_path: 输入PDF路径
-            output_path: 输出PDF路径，默认为 input_translated.pdf
+            output_path: 输出路径（不带扩展名时会自动添加）
             pages: 要处理的页码列表，默认处理所有页
         
         Returns:
-            输出文件路径
+            输出文件路径（如果是both模式，返回Markdown路径）
         """
         input_path = Path(input_path)
         
+        # 确定输出路径
         if output_path is None:
-            output_path = input_path.with_stem(f"{input_path.stem}_translated")
-        output_path = Path(output_path)
+            base_output = input_path.with_stem(f"{input_path.stem}_translated")
+        else:
+            base_output = Path(output_path)
+            # 如果指定了完整路径，根据格式调整扩展名
+            if base_output.suffix:
+                base_output = base_output.with_suffix("")
         
         # 提取PDF内容
         with PDFExtractor(str(input_path)) as extractor:
@@ -218,17 +235,48 @@ class PDFProcessor:
                 if self.progress_callback:
                     self.progress_callback(i + 1, len(pages))
         
-        # 渲染输出PDF
-        renderer = PDFRenderer(
-            font_scale=self.font_scale,
-            fallback_font_path=self.fallback_font,
-            bilingual=self.bilingual,
-        )
+        output_files = []
         
-        renderer.render(
-            str(input_path),
-            all_pages_content,
-            str(output_path),
-        )
+        # 根据输出格式渲染
+        if self.output_format in (OutputFormat.PDF, OutputFormat.BOTH):
+            pdf_output = base_output.with_suffix(".pdf")
+            
+            renderer = PDFRenderer(
+                font_scale=self.font_scale,
+                fallback_font_path=self.fallback_font,
+                bilingual=self.bilingual,
+            )
+            
+            renderer.render(
+                str(input_path),
+                all_pages_content,
+                str(pdf_output),
+            )
+            output_files.append(str(pdf_output))
         
-        return str(output_path)
+        if self.output_format in (OutputFormat.MARKDOWN, OutputFormat.BOTH):
+            md_output = base_output.with_suffix(".md")
+            
+            md_renderer = MarkdownRenderer(
+                bilingual=self.bilingual,
+                include_page_breaks=True,
+                preserve_structure=True,
+            )
+            
+            # 使用文件名作为标题
+            title = input_path.stem.replace("_", " ").replace("-", " ")
+            
+            md_renderer.render(
+                all_pages_content,
+                str(md_output),
+                title=title,
+            )
+            output_files.append(str(md_output))
+        
+        # 返回主要输出路径
+        if self.output_format == OutputFormat.MARKDOWN:
+            return output_files[0]
+        elif self.output_format == OutputFormat.BOTH:
+            return output_files[-1]  # 返回Markdown路径
+        else:
+            return output_files[0]  # 返回PDF路径

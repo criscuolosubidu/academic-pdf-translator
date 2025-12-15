@@ -6,6 +6,7 @@ PDF渲染模块
 from pathlib import Path
 from typing import List, Optional, Tuple
 import io
+import textwrap
 
 from .extractor import PageContent, TextBlock
 
@@ -34,6 +35,7 @@ class PDFRenderer:
         self.fallback_font_path = fallback_font_path
         self.bilingual = bilingual
         self._fitz = None
+        self._font_cache = {}
     
     @property
     def fitz(self):
@@ -65,32 +67,114 @@ class PDFRenderer:
         # 对于纯英文，尝试使用原字体或默认字体
         return "helv", None  # Helvetica
     
+    def _get_font(self, font_name: str):
+        """获取或缓存字体对象"""
+        if font_name not in self._font_cache:
+            self._font_cache[font_name] = self.fitz.Font(font_name)
+        return self._font_cache[font_name]
+    
+    def _calculate_text_width(self, text: str, font, font_size: float) -> float:
+        """计算文本的实际宽度"""
+        try:
+            return font.text_length(text, fontsize=font_size)
+        except Exception:
+            # 粗略估计：中文字符约等于字体大小，英文约0.6倍
+            width = 0
+            for char in text:
+                if '\u4e00' <= char <= '\u9fff':
+                    width += font_size
+                else:
+                    width += font_size * 0.5
+            return width
+    
+    def _wrap_text_to_width(
+        self,
+        text: str,
+        font,
+        font_size: float,
+        max_width: float,
+    ) -> List[str]:
+        """
+        将文本按指定宽度换行
+        
+        Args:
+            text: 待换行的文本
+            font: 字体对象
+            font_size: 字体大小
+            max_width: 最大宽度
+        
+        Returns:
+            换行后的文本行列表
+        """
+        if not text.strip():
+            return []
+        
+        lines = []
+        current_line = ""
+        
+        # 对于中文，按字符分割；对于英文，按单词分割
+        has_cjk = any('\u4e00' <= c <= '\u9fff' for c in text)
+        
+        if has_cjk:
+            # 按字符处理
+            for char in text:
+                test_line = current_line + char
+                width = self._calculate_text_width(test_line, font, font_size)
+                
+                if width <= max_width:
+                    current_line = test_line
+                else:
+                    if current_line:
+                        lines.append(current_line)
+                    current_line = char
+        else:
+            # 按单词处理
+            words = text.split()
+            for word in words:
+                test_line = current_line + (" " if current_line else "") + word
+                width = self._calculate_text_width(test_line, font, font_size)
+                
+                if width <= max_width:
+                    current_line = test_line
+                else:
+                    if current_line:
+                        lines.append(current_line)
+                    current_line = word
+        
+        if current_line:
+            lines.append(current_line)
+        
+        return lines if lines else [text]
+    
     def _calculate_font_size(
         self, 
         original_size: float, 
         original_text: str, 
         translated_text: str,
         max_width: float,
+        max_height: float,
+        font,
     ) -> float:
         """
         计算翻译后文本应该使用的字体大小
         
-        考虑翻译后文本长度变化，动态调整字体大小
+        考虑翻译后文本长度变化和可用空间，动态调整字体大小
         """
-        # 基础缩放
+        # 从原始大小开始尝试
         size = original_size * self.font_scale
+        min_size = max(6, original_size * 0.4)  # 最小字体
         
-        # 根据文本长度比例进一步调整
-        len_ratio = len(translated_text) / max(len(original_text), 1)
+        # 逐步减小字体直到文本能够容纳
+        while size > min_size:
+            lines = self._wrap_text_to_width(translated_text, font, size, max_width)
+            total_height = len(lines) * size * 1.2  # 行高约1.2倍
+            
+            if total_height <= max_height * 1.5:  # 允许一定的溢出
+                break
+            
+            size -= 0.5
         
-        if len_ratio > 1.5:
-            # 翻译后文本明显变长，进一步缩小字体
-            size = size / (len_ratio * 0.7)
-        
-        # 设置字体大小范围
-        size = max(min(size, original_size), original_size * 0.5)
-        
-        return size
+        return max(size, min_size)
     
     def render_page(
         self,
@@ -122,9 +206,17 @@ class PDFRenderer:
             # 获取文本区域
             rect = fitz.Rect(block.bbox)
             
+            # 稍微扩展区域以确保完全覆盖
+            expanded_rect = fitz.Rect(
+                rect.x0 - 1,
+                rect.y0 - 1,
+                rect.x1 + 1,
+                rect.y1 + 1,
+            )
+            
             # 创建白色背景遮盖原文本
             shape = out_page.new_shape()
-            shape.draw_rect(rect)
+            shape.draw_rect(expanded_rect)
             shape.finish(color=None, fill=(1, 1, 1))  # 白色填充
             shape.commit()
             
@@ -134,48 +226,77 @@ class PDFRenderer:
                 block.font_name
             )
             
-            # 计算字体大小
+            # 获取字体对象
+            font = self._get_font(font_name)
+            
+            # 计算字体大小（考虑换行）
             font_size = self._calculate_font_size(
                 block.font_size,
                 block.text,
                 block.translated_text,
                 block.width,
+                block.height,
+                font,
             )
             
             # 转换颜色
             color = self._int_to_rgb(block.font_color)
             
-            # 插入翻译后的文本
-            # 使用text writer来更好地控制文本渲染
+            # 将文本换行
+            lines = self._wrap_text_to_width(
+                block.translated_text,
+                font,
+                font_size,
+                block.width,
+            )
+            
+            # 计算行高
+            line_height = font_size * 1.15
+            
+            # 插入翻译后的文本（逐行）
             try:
-                # 尝试使用TextWriter获得更好的控制
                 tw = fitz.TextWriter(out_page.rect)
                 
-                # 加载字体
-                font = fitz.Font(font_name)
+                # 计算起始位置
+                y_start = block.y0 + font_size
                 
-                # 计算文本位置
-                text_point = fitz.Point(block.x0, block.y1 - 2)
-                
-                # 写入文本（可能需要分行）
-                tw.append(
-                    text_point,
-                    block.translated_text,
-                    font=font,
-                    fontsize=font_size,
-                )
+                for i, line in enumerate(lines):
+                    y_pos = y_start + i * line_height
+                    
+                    # 如果超出区域太多，跳过后续行
+                    if y_pos > block.y1 + block.height * 0.5:
+                        break
+                    
+                    text_point = fitz.Point(block.x0, y_pos)
+                    tw.append(
+                        text_point,
+                        line,
+                        font=font,
+                        fontsize=font_size,
+                    )
                 
                 tw.write_text(out_page, color=color)
                 
             except Exception:
-                # 回退到简单的insert_text方法
-                out_page.insert_text(
-                    fitz.Point(block.x0, block.y1 - 2),
-                    block.translated_text,
-                    fontname=font_name,
-                    fontsize=font_size,
-                    color=color,
-                )
+                # 回退到使用 insert_textbox 方法，自动处理换行
+                try:
+                    out_page.insert_textbox(
+                        rect,
+                        block.translated_text,
+                        fontname=font_name,
+                        fontsize=font_size,
+                        color=color,
+                        align=0,  # 左对齐
+                    )
+                except Exception:
+                    # 最后回退到简单的insert_text
+                    out_page.insert_text(
+                        fitz.Point(block.x0, block.y0 + font_size),
+                        block.translated_text[:50] + "..." if len(block.translated_text) > 50 else block.translated_text,
+                        fontname=font_name,
+                        fontsize=font_size,
+                        color=color,
+                    )
     
     def render_page_overlay(
         self,
