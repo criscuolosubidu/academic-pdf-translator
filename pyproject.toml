@@ -1,14 +1,14 @@
 [project]
 name = "academic-pdf-translator"
-version = "0.1.0"
-description = "学术论文翻译器 - 支持多种翻译API，保留PDF排版格式"
+version = "0.2.0"
+description = "学术论文翻译器 - 基于MinerU解析PDF，支持多种翻译API"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
 authors = [
     { name = "Academic PDF Translator" }
 ]
-keywords = ["pdf", "translation", "academic", "openai", "google-translate"]
+keywords = ["pdf", "translation", "academic", "openai", "google-translate", "mineru"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
@@ -22,9 +22,9 @@ classifiers = [
 ]
 
 dependencies = [
-    # PDF处理
-    "PyMuPDF>=1.23.0",
-    "pdfplumber>=0.10.0",
+    # PDF解析（MinerU）
+    "mineru>=1.0.0",
+    "loguru>=0.7.0",
     # 翻译API
     "openai>=1.0.0",
     "google-cloud-translate>=3.12.0",
@@ -33,10 +33,14 @@ dependencies = [
     "pyyaml>=6.0",
     "click>=8.1.0",
     "tqdm>=4.66.0",
-    "Pillow>=10.0.0",
 ]
 
 [project.optional-dependencies]
+# VLM后端支持
+vlm = [
+    "transformers>=4.35.0",
+    "torch>=2.0.0",
+]
 # 本地LLM支持
 local-llm = [
     "vllm>=0.2.0",
@@ -79,4 +83,3 @@ warn_unused_ignores = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = "test_*.py"
-

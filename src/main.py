@@ -16,7 +16,6 @@ from .pdf.processor import OutputFormat
 def create_processor(
     config: Config,
     translator_name: Optional[str] = None,
-    output_format: OutputFormat = OutputFormat.PDF,
 ) -> PDFProcessor:
     """
     根据配置创建PDF处理器
@@ -24,7 +23,6 @@ def create_processor(
     Args:
         config: 配置对象
         translator_name: 翻译器名称，默认使用配置中的默认翻译器
-        output_format: 输出格式
     
     Returns:
         PDFProcessor实例
@@ -64,21 +62,35 @@ def create_processor(
     
     return PDFProcessor(
         translator=translator,
-        font_scale=config.pdf.font_scale,
         bilingual=config.pdf.bilingual,
-        fallback_font=config.pdf.fallback_font,
-        output_format=output_format,
     )
 
 
-@click.group()
+class DefaultGroup(click.Group):
+    """支持默认命令的 Click Group"""
+    
+    def __init__(self, *args, default_cmd=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.default_cmd = default_cmd
+    
+    def resolve_command(self, ctx, args):
+        try:
+            return super().resolve_command(ctx, args)
+        except click.UsageError:
+            # 如果命令不存在，尝试使用默认命令
+            if self.default_cmd:
+                return self.default_cmd, self.commands[self.default_cmd], args
+            raise
+
+
+@click.group(cls=DefaultGroup, default_cmd="translate")
 @click.version_option(version="0.1.0")
 def cli():
     """学术论文翻译器 - 支持多种翻译API，保留PDF排版格式"""
     pass
 
 
-@cli.command()
+@cli.command(name="translate")
 @click.argument("input_pdf", type=click.Path(exists=True))
 @click.option("-o", "--output", type=click.Path(), help="输出文件路径")
 @click.option("-c", "--config", "config_path", type=click.Path(exists=True), help="配置文件路径")
@@ -148,7 +160,7 @@ def translate(
         fmt = OutputFormat.PDF
     
     # 创建处理器
-    processor = create_processor(config, translator, output_format=fmt)
+    processor = create_processor(config, translator)
     
     click.echo(f"正在翻译: {input_pdf}")
     click.echo(f"翻译器: {translator or config.default_translator}")
@@ -341,7 +353,7 @@ def translate_pdf(
     else:
         fmt = OutputFormat.PDF
     
-    processor = create_processor(config, translator, output_format=fmt)
+    processor = create_processor(config, translator)
     
     return processor.process(
         input_path=input_path,
