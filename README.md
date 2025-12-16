@@ -1,284 +1,56 @@
-# 📚 Academic Paper Translator
+# Academic PDF Translator
 
-学术论文翻译器 - 支持多种翻译API，**保留PDF排版格式**
+学术论文 PDF 翻译工具，保留原文排版。
 
-专为医学和计算机科学领域的学术论文设计，提供高质量的翻译体验。
-
-## ✨ 特性
-
-- 🔄 **多翻译后端支持**
-  - Google Translate API
-  - OpenAI API (GPT-4o等)
-  - 本地LLM (vLLM, Ollama等OpenAI兼容接口)
-
-- 📄 **保留PDF格式**
-  - 提取原始文本位置和样式
-  - 在原位置渲染翻译文本
-  - 支持双语对照模式
-
-- 🎯 **学术翻译优化**
-  - 专业术语保留英文原文
-  - 医学/计算机领域优化
-  - 保持学术语体
-
-- 🛠️ **简洁可扩展架构**
-  - 模块化设计
-  - 易于添加新翻译器
-  - 配置灵活
-
-## 📦 安装
-
-本项目使用 [uv](https://docs.astral.sh/uv/) 管理依赖。
+## 安装
 
 ```bash
-# 安装 uv (如果尚未安装)
-# Windows (PowerShell)
+# 安装 uv
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 
-# macOS/Linux
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# 克隆仓库
-git clone <repository-url>
-cd academic-paper-translator
-
-# 安装依赖 (uv 会自动创建虚拟环境)
+# 安装依赖
 uv sync
-
-# 如需本地LLM支持
-uv sync --extra local-llm
 ```
 
-## 🚀 快速开始
+## 配置
 
-### 命令行使用
-
-```bash
-# 使用OpenAI翻译
-export OPENAI_API_KEY="your-api-key"  # Linux/macOS
-$env:OPENAI_API_KEY="your-api-key"    # Windows PowerShell
-
-uv run translate translate paper.pdf
-
-# 指定输出文件
-uv run translate translate paper.pdf -o paper_zh.pdf
-
-# 使用本地LLM
-uv run translate translate paper.pdf -t local_llm
-
-# 生成双语对照版本
-uv run translate translate paper.pdf --bilingual
-
-# 只翻译指定页面
-uv run translate translate paper.pdf --pages "1-5,10"
-```
-
-> **⚠️ 中文路径问题**：如果项目路径包含中文（如 `D:\项目\`），可能导致 `ModuleNotFoundError: No module named 'src'` 错误。请使用以下备用命令：
->
-> ```bash
-> # 备用运行方式（模块方式）
-> uv run python -m src.main translate paper.pdf -o paper_zh.pdf
-> ```
->
-> 或将项目移动到纯英文路径下。
-
-### Python API使用
-
-```python
-from src.main import translate_pdf
-
-# 简单使用
-output = translate_pdf(
-    "paper.pdf",
-    translator="openai",
-    api_key="sk-xxx",
-)
-
-# 完整参数
-output = translate_pdf(
-    input_path="paper.pdf",
-    output_path="paper_translated.pdf",
-    translator="openai",  # google, openai, local_llm
-    source_lang="en",
-    target_lang="zh",
-    api_key="sk-xxx",
-    model="gpt-4o",
-    pages=[0, 1, 2],  # 0-based页码
-    bilingual=False,
-)
-```
-
-### 使用本地LLM (vLLM)
-
-```python
-from src.main import translate_pdf
-
-# 使用vLLM部署的本地模型
-output = translate_pdf(
-    "paper.pdf",
-    translator="local_llm",
-    base_url="http://localhost:8000/v1",
-    model="qwen2.5-72b-instruct",
-)
-```
-
-## ⚙️ 配置
-
-复制配置模板并编辑：
+复制并编辑配置文件：
 
 ```bash
 cp config.yaml.example config.yaml
 ```
 
-配置文件示例：
+设置 API Key（任选一种）：
 
 ```yaml
-# 默认翻译器
-default_translator: openai
-
-# 语言设置
-source_lang: en
-target_lang: zh
-
-# OpenAI配置
+# config.yaml
 openai:
-  api_key: ${OPENAI_API_KEY}  # 从环境变量读取
+  api_key: sk-xxx
+  base_url: https://api.openai.com/v1  # 或其他兼容接口
   model: gpt-4o
-  base_url: https://api.openai.com/v1
-  system_prompt: |
-    你是一位专业的学术论文翻译专家...
-
-# 本地LLM配置
-local_llm:
-  base_url: http://localhost:8000/v1
-  model: qwen2.5-72b-instruct
-
-# PDF处理配置
-pdf:
-  bilingual: false      # 双语对照
-  font_scale: 0.9       # 字体缩放
 ```
 
-## 🏗️ 项目结构
-
-```
-.
-├── translate.py          # 命令行入口 (兼容旧用法)
-├── pyproject.toml        # 项目配置和依赖 (uv)
-├── config.yaml.example   # 配置模板
-└── src/
-    ├── __init__.py
-    ├── main.py           # 主程序和CLI
-    ├── config.py         # 配置管理
-    ├── translators/      # 翻译器模块
-    │   ├── base.py       # 翻译器基类
-    │   ├── google.py     # Google翻译
-    │   ├── openai.py     # OpenAI翻译
-    │   └── local_llm.py  # 本地LLM翻译
-    ├── pdf/              # PDF处理模块
-    │   ├── extractor.py  # 内容提取
-    │   ├── renderer.py   # 重新渲染
-    │   └── processor.py  # 处理流程
-    └── utils/            # 工具函数
-        └── text.py       # 文本处理
-```
-
-## 🔧 扩展
-
-### 添加新的翻译器
-
-1. 在 `src/translators/` 下创建新文件
-2. 继承 `BaseTranslator` 类
-3. 实现 `translate()` 方法
-4. 在 `__init__.py` 中注册
-
-```python
-from .base import BaseTranslator, TranslationResult
-
-class MyTranslator(BaseTranslator):
-    def translate(self, text: str) -> TranslationResult:
-        # 实现翻译逻辑
-        translated = my_translation_api(text)
-        return TranslationResult(
-            original=text,
-            translated=translated,
-            source_lang=self.source_lang,
-            target_lang=self.target_lang,
-        )
-```
-
-### 自定义PDF渲染
-
-可以继承或修改 `PDFRenderer` 类来自定义渲染行为：
-
-```python
-from src.pdf import PDFRenderer
-
-class CustomRenderer(PDFRenderer):
-    def render_page(self, ...):
-        # 自定义渲染逻辑
-        pass
-```
-
-## 📋 命令参考
+## 使用
 
 ```bash
-# 查看帮助
-uv run translate --help
-uv run translate translate --help
+# 翻译 PDF（输出到 output/ 目录）
+uv run --no-editable translate translate paper.pdf
 
-# 翻译PDF
-uv run translate translate <input.pdf> [OPTIONS]
+# 指定输出文件
+uv run --no-editable translate translate paper.pdf -o translated.pdf
 
-# 提取PDF文本（调试用）
-uv run translate extract <input.pdf> -o output.json
+# 输出 Markdown 格式
+uv run --no-editable translate translate paper.pdf -f markdown
 
-# 测试API连接
-uv run translate test-connection -t openai
-uv run translate test-connection -t local_llm
+# 双语对照
+uv run --no-editable translate translate paper.pdf --bilingual
 ```
 
-### 备用命令（中文路径兼容）
+> **注意**：如果项目路径包含中文，必须加 `--no-editable` 参数，或使用：
+> ```bash
+> uv run python -m src.main translate paper.pdf
+> ```
 
-如果遇到模块导入问题，使用模块方式运行：
+## 许可证
 
-```bash
-# 查看帮助
-uv run python -m src.main --help
-
-# 翻译PDF
-uv run python -m src.main translate <input.pdf> [OPTIONS]
-
-# 提取PDF文本
-uv run python -m src.main extract <input.pdf> -o output.json
-
-# 测试API连接
-uv run python -m src.main test-connection -t openai
-```
-
-## ⚠️ 注意事项
-
-1. **PDF格式保留限制**
-   - 复杂布局（多栏、表格）可能需要手动调整
-   - 公式和图片会保留，但其中的文字不会翻译
-   - 字体渲染取决于系统可用字体
-
-2. **翻译质量**
-   - OpenAI/大模型通常提供更好的学术翻译质量
-   - Google Translate速度快，适合草稿翻译
-   - 专业术语建议检查
-
-3. **API费用**
-   - 请注意各翻译服务的计费方式
-   - 建议先用少量页面测试
-
-4. **中文路径兼容性**
-   - 项目路径包含中文字符时，`uv run translate` 命令可能报错 `ModuleNotFoundError: No module named 'src'`
-   - 这是由于 Windows 下路径编码问题导致入口点脚本无法正确解析路径
-   - **解决方案**：
-     - 使用模块方式运行：`uv run python -m src.main translate ...`
-     - 或将项目移动到纯英文路径（推荐）
-
-## 📄 许可证
-
-MIT License
+MIT
