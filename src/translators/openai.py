@@ -6,17 +6,11 @@ OpenAI API 翻译器
 from typing import List, Optional
 
 from .base import BaseTranslator, TranslationResult
+from .prompts import get_translation_prompt
 
 
-# 默认的学术翻译提示词
-DEFAULT_SYSTEM_PROMPT = """你是一位专业的学术论文翻译专家，精通医学和计算机科学领域。
-请将以下学术文本翻译成{target_lang}，保持专业术语的准确性。
-
-翻译要求：
-1. 保留重要专业术语的英文原文（用括号标注）
-2. 保持学术论文的正式语体
-3. 确保医学/计算机术语翻译的准确性
-4. 不要添加任何解释或额外内容，只输出翻译结果"""
+# 默认的学术翻译提示词（已优化）
+DEFAULT_SYSTEM_PROMPT = get_translation_prompt()
 
 
 class OpenAITranslator(BaseTranslator):
@@ -49,7 +43,7 @@ class OpenAITranslator(BaseTranslator):
         self.api_key = api_key
         self.model = model
         self.base_url = base_url
-        self.system_prompt = system_prompt or DEFAULT_SYSTEM_PROMPT.format(
+        self.system_prompt = system_prompt or get_translation_prompt(
             target_lang=self._get_lang_name(target_lang)
         )
         self._client = None
