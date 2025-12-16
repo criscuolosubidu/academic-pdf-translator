@@ -1,0 +1,85 @@
+[project]
+name = "academic-pdf-translator"
+version = "0.2.0"
+description = "学术论文翻译器 - 基于MinerU解析PDF，支持多种翻译API"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [
+    { name = "Academic PDF Translator" }
+]
+keywords = ["pdf", "translation", "academic", "openai", "google-translate", "mineru"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Text Processing :: Linguistic",
+]
+
+dependencies = [
+    # PDF解析（MinerU）
+    "mineru>=1.0.0",
+    "loguru>=0.7.0",
+    # 翻译API
+    "openai>=1.0.0",
+    "google-cloud-translate>=3.12.0",
+    "httpx>=0.25.0",
+    # 工具
+    "pyyaml>=6.0",
+    "click>=8.1.0",
+    "tqdm>=4.66.0",
+]
+
+[project.optional-dependencies]
+# VLM后端支持
+vlm = [
+    "transformers>=4.35.0",
+    "torch>=2.0.0",
+]
+# 本地LLM支持
+local-llm = [
+    "vllm>=0.2.0",
+]
+# 开发依赖
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+]
+
+[project.scripts]
+translate = "src.main:cli"
+
+[project.urls]
+Homepage = "https://github.com/your-username/academic-pdf-translator"
+Repository = "https://github.com/your-username/academic-pdf-translator"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_ignores = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
