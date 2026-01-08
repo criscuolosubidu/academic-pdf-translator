@@ -54,6 +54,7 @@ htmlcov/
 output/
 config.yaml
 *.log
+data/
 
 # OS generated
 .DS_Store
