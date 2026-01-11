@@ -10,6 +10,7 @@ from typing import Optional, List
 from .config import load_config, Config
 from .translators import get_translator
 from .pdf import PDFProcessor
+from .pdf.processor import OutputFormat
 
 
 def create_processor(
@@ -61,20 +62,35 @@ def create_processor(
     
     return PDFProcessor(
         translator=translator,
-        font_scale=config.pdf.font_scale,
         bilingual=config.pdf.bilingual,
-        fallback_font=config.pdf.fallback_font,
     )
 
 
-@click.group()
+class DefaultGroup(click.Group):
+    """支持默认命令的 Click Group"""
+    
+    def __init__(self, *args, default_cmd=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.default_cmd = default_cmd
+    
+    def resolve_command(self, ctx, args):
+        try:
+            return super().resolve_command(ctx, args)
+        except click.UsageError:
+            # 如果命令不存在，尝试使用默认命令
+            if self.default_cmd:
+                return self.default_cmd, self.commands[self.default_cmd], args
+            raise
+
+
+@click.group(cls=DefaultGroup, default_cmd="translate")
 @click.version_option(version="0.1.0")
 def cli():
     """学术论文翻译器 - 支持多种翻译API，保留PDF排版格式"""
     pass
 
 
-@cli.command()
+@cli.command(name="translate")
 @click.argument("input_pdf", type=click.Path(exists=True))
 @click.option("-o", "--output", type=click.Path(), help="输出文件路径")
 @click.option("-c", "--config", "config_path", type=click.Path(exists=True), help="配置文件路径")
@@ -83,6 +99,13 @@ def cli():
 @click.option("--target-lang", default="zh", help="目标语言 (默认: zh)")
 @click.option("--pages", help="要翻译的页码，如 '1,2,3' 或 '1-5'")
 @click.option("--bilingual", is_flag=True, help="生成双语对照版本")
+@click.option(
+    "-f", "--format",
+    "output_format",
+    type=click.Choice(["pdf", "markdown", "md", "both"]),
+    default="pdf",
+    help="输出格式: pdf (默认), markdown/md (Markdown文件), both (同时输出PDF和Markdown)"
+)
 def translate(
     input_pdf: str,
     output: Optional[str],
@@ -92,8 +115,26 @@ def translate(
     target_lang: str,
     pages: Optional[str],
     bilingual: bool,
+    output_format: str,
 ):
-    """翻译PDF学术论文"""
+    """翻译PDF学术论文
+    
+    支持输出为PDF（保持原布局）或Markdown（更好的可读性）格式。
+    
+    \b
+    示例:
+      # 输出为PDF（默认）
+      translate paper.pdf
+      
+      # 输出为Markdown（推荐，格式更好）
+      translate paper.pdf -f markdown
+      
+      # 同时输出PDF和Markdown
+      translate paper.pdf -f both
+      
+      # 双语对照的Markdown
+      translate paper.pdf -f markdown --bilingual
+    """
     # 加载配置
     config = load_config(config_path)
     
@@ -110,12 +151,21 @@ def translate(
     if pages:
         page_list = parse_page_range(pages)
     
+    # 解析输出格式
+    if output_format in ("markdown", "md"):
+        fmt = OutputFormat.MARKDOWN
+    elif output_format == "both":
+        fmt = OutputFormat.BOTH
+    else:
+        fmt = OutputFormat.PDF
+    
     # 创建处理器
     processor = create_processor(config, translator)
     
     click.echo(f"正在翻译: {input_pdf}")
     click.echo(f"翻译器: {translator or config.default_translator}")
     click.echo(f"语言: {config.source_lang} -> {config.target_lang}")
+    click.echo(f"输出格式: {output_format}")
     
     # 执行翻译
     output_path = processor.process(
@@ -125,6 +175,10 @@ def translate(
     )
     
     click.echo(f"翻译完成: {output_path}")
+    
+    if fmt == OutputFormat.BOTH:
+        pdf_path = Path(output_path).with_suffix(".pdf")
+        click.echo(f"PDF输出: {pdf_path}")
 
 
 @cli.command()
@@ -230,13 +284,14 @@ def translate_pdf(
     base_url: Optional[str] = None,
     pages: Optional[List[int]] = None,
     bilingual: bool = False,
+    output_format: str = "pdf",
 ) -> str:
     """
     翻译PDF的简单接口
     
     Args:
         input_path: 输入PDF路径
-        output_path: 输出PDF路径
+        output_path: 输出路径（不含扩展名）
         translator: 翻译器名称
         source_lang: 源语言
         target_lang: 目标语言
@@ -245,16 +300,25 @@ def translate_pdf(
         base_url: API基础URL
         pages: 要翻译的页码列表（0-based）
         bilingual: 是否生成双语版本
+        output_format: 输出格式 ("pdf", "markdown", "both")
     
     Returns:
         输出文件路径
     
     Example:
         >>> from src.main import translate_pdf
+        >>> # 输出为PDF
         >>> output = translate_pdf(
         ...     "paper.pdf",
         ...     translator="openai",
         ...     api_key="sk-xxx",
+        ... )
+        >>> # 输出为Markdown（格式更好）
+        >>> output = translate_pdf(
+        ...     "paper.pdf",
+        ...     translator="openai",
+        ...     api_key="sk-xxx",
+        ...     output_format="markdown",
         ... )
     """
     # 构建配置
@@ -280,6 +344,14 @@ def translate_pdf(
             config.openai.base_url = base_url
         elif translator == "local_llm":
             config.local_llm.base_url = base_url
+    
+    # 解析输出格式
+    if output_format in ("markdown", "md"):
+        fmt = OutputFormat.MARKDOWN
+    elif output_format == "both":
+        fmt = OutputFormat.BOTH
+    else:
+        fmt = OutputFormat.PDF
     
     processor = create_processor(config, translator)
     
